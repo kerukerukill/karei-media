@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<title>KAREI media relay</title>
+<style>
+body{font:14px/1.6 system-ui,sans-serif;background:#111;color:#eee;margin:24px}
+#s{white-space:pre-wrap}
+.ok{color:#7c7}.ng{color:#f77}
+</style>
+</head>
+<body>
+<p>KAREI media relay</p>
+<p id="s">準備中…</p>
+<script>
+(function () {
+  'use strict';
+  // 受け渡し先として許可するサイト（これ以外には送らない）
+  var TARGETS = [
+    'https://www.tiktok.com',
+    'https://www.instagram.com',
+    'https://x.com',
+    'https://studio.youtube.com',
+    'https://www.youtube.com'
+  ];
+  // このリポジトリの v/ 配下のファイルだけを扱う
+  var FILE_RE = /^v\/[A-Za-z0-9_\-]+\.(mp4|mov|jpg|jpeg|png)$/;
+  var TYPES = { mp4: 'video/mp4', mov: 'video/quicktime', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
+
+  var s = document.getElementById('s');
+  function log(msg, cls) { s.textContent = msg; s.className = cls || ''; }
+
+  var f = new URLSearchParams(location.search).get('f') || '';
+  if (!FILE_RE.test(f)) { log('ファイル指定が不正です: ' + f, 'ng'); return; }
+  if (!window.opener) { log('呼び出し元のタブが見つかりません（投稿画面から開いてください）', 'ng'); return; }
+
+  var name = f.split('/').pop();
+  var ext = name.split('.').pop().toLowerCase();
+
+  log('取得中: ' + name);
+  fetch(f, { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.blob();
+    })
+    .then(function (b) {
+      var file = new File([b], name, { type: TYPES[ext] || b.type });
+      TARGETS.forEach(function (o) {
+        try { window.opener.postMessage({ type: 'karei-file', file: file }, o); } catch (e) {}
+      });
+      log('送信しました: ' + name + '（' + Math.round(file.size / 1024) + ' KB）\nこのタブは数秒で閉じます。', 'ok');
+      setTimeout(function () { window.close(); }, 4000);
+    })
+    .catch(function (e) { log('取得に失敗しました: ' + e.message, 'ng'); });
+})();
+</script>
+</body>
+</html>
